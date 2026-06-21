@@ -297,8 +297,8 @@ function Designer() {
   };
   const [chainDip, setChainDip] = useState(90);
   const [chainLeftX, setChainLeftX] = useState(9);
-  const [chainRightX, setChainRightX] = useState(91);
-  const [chainY, setChainY] = useState(45);
+  const [chainRightX, setChainRightX] = useState(92);
+  const [chainY, setChainY] = useState(52);
   const [chainColor, setChainColor] = useState<"silver" | "gold">("silver");
   const [chainStyle, setChainStyle] = useState<"rope" | "paperclip">("rope");
   const [trayOpen, setTrayOpen] = useState<null | "stones" | "charms" | "parts">(null);

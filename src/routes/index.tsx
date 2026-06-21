@@ -1878,6 +1878,8 @@ function Designer() {
                 addToChain(it, stoneSize);
               }}
               variant="sheet"
+              disabled={trayOpen === "stones" && stonesLocked}
+              onDisabledAttempt={() => setWarning(stonesLockedMessage)}
             />
           </div>
         </div>
@@ -1932,18 +1934,42 @@ function Tray({
   onDragStart,
   onPick,
   variant,
+  disabled,
+  onDisabledAttempt,
 }: {
   title: string;
   items: Item[];
   onDragStart: (i: Item) => void;
   onPick: (i: Item, stoneSize?: number) => void;
   variant?: "sheet" | "default";
+  disabled?: boolean;
+  onDisabledAttempt?: () => void;
 }) {
   const isStoneTray = items.length > 0 && items.every((it) => it.category === "stone");
   const inSheet = variant === "sheet";
 
   return (
-    <aside className={inSheet ? "" : "self-start rounded-xl border border-stone-300 bg-white/80 p-3 shadow-sm backdrop-blur"}>
+    <aside
+      className={`${inSheet ? "" : "self-start rounded-xl border border-stone-300 bg-white/80 p-3 shadow-sm backdrop-blur"} ${disabled ? "opacity-50" : ""}`}
+      onPointerDownCapture={
+        disabled
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDisabledAttempt?.();
+            }
+          : undefined
+      }
+      onClickCapture={
+        disabled
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDisabledAttempt?.();
+            }
+          : undefined
+      }
+    >
       <h2 className="mb-2 px-1 font-serif text-sm uppercase tracking-[0.18em] text-stone-600">
         {title}
       </h2>
@@ -1954,13 +1980,17 @@ function Tray({
         {items.map((it) => (
           <div
             key={it.id}
-            className={`group flex flex-col items-center gap-1 rounded-lg border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100 p-2 transition hover:border-stone-400 hover:from-white hover:shadow-md ${inSheet ? "w-24 shrink-0" : ""}`}
+            className={`group flex flex-col items-center gap-1 rounded-lg border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100 p-2 transition hover:border-stone-400 hover:from-white hover:shadow-md ${inSheet ? "w-24 shrink-0" : ""} ${disabled ? "cursor-not-allowed" : ""}`}
             title={`${it.name} — ${it.price} ₺`}
           >
             <div
-              draggable
-              onDragStart={() => onDragStart(it)}
+              draggable={!disabled}
+              onDragStart={() => {
+                if (disabled) return;
+                onDragStart(it);
+              }}
               onClick={() => {
+                if (disabled) return;
                 if (!isStoneTray) onPick(it);
               }}
               className={`flex w-full flex-col items-center gap-0.5 ${isStoneTray ? "cursor-grab" : "cursor-pointer active:scale-95"}`}

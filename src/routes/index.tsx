@@ -11,6 +11,7 @@ import {
   type PartDTO,
 } from "@/lib/wix.functions";
 import { SavedDesignsDialog } from "@/components/SavedDesignsDialog";
+import { PaperclipChain } from "@/components/PaperclipChain";
 import { loadDraft, saveDraft, clearDraft, type DesignState } from "@/lib/design-storage";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -299,6 +300,7 @@ function Designer() {
   const [chainRightX, setChainRightX] = useState(91);
   const [chainY, setChainY] = useState(45);
   const [chainColor, setChainColor] = useState<"silver" | "gold">("silver");
+  const [chainStyle, setChainStyle] = useState<"rope" | "paperclip">("rope");
   const [trayOpen, setTrayOpen] = useState<null | "stones" | "charms" | "parts">(null);
   const [zoom, setZoom] = useState(1);
   const isMobile = useIsMobile();
@@ -319,6 +321,7 @@ function Designer() {
     if (typeof d.chainRightX === "number") setChainRightX(d.chainRightX);
     if (typeof d.chainY === "number") setChainY(d.chainY);
     if (d.chainColor === "gold" || d.chainColor === "silver") setChainColor(d.chainColor);
+    if (d.chainStyle === "rope" || d.chainStyle === "paperclip") setChainStyle(d.chainStyle);
     if (typeof d.lightEnabled === "boolean") setLightEnabled(d.lightEnabled);
     if (typeof d.lightIntensity === "number") setLightIntensity(d.lightIntensity);
   }, []);
@@ -327,10 +330,10 @@ function Designer() {
   useEffect(() => {
     if (!draftHydratedRef.current) return;
     const t = setTimeout(() => {
-      saveDraft({ placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, lightEnabled, lightIntensity });
+      saveDraft({ placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, chainStyle, lightEnabled, lightIntensity });
     }, 400);
     return () => clearTimeout(t);
-  }, [placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, lightEnabled, lightIntensity]);
+  }, [placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, chainStyle, lightEnabled, lightIntensity]);
 
   const currentDesign: DesignState = {
     placed,
@@ -339,6 +342,7 @@ function Designer() {
     chainRightX,
     chainY,
     chainColor,
+    chainStyle,
     lightEnabled,
     lightIntensity,
   };
@@ -350,6 +354,8 @@ function Designer() {
     if (typeof d.chainRightX === "number") setChainRightX(d.chainRightX);
     if (typeof d.chainY === "number") setChainY(d.chainY);
     if (d.chainColor === "gold" || d.chainColor === "silver") setChainColor(d.chainColor);
+    if (d.chainStyle === "rope" || d.chainStyle === "paperclip") setChainStyle(d.chainStyle);
+    else setChainStyle("rope");
     if (typeof d.lightEnabled === "boolean") setLightEnabled(d.lightEnabled);
     if (typeof d.lightIntensity === "number") setLightIntensity(d.lightIntensity);
     setSelectedUid(null);
@@ -1229,23 +1235,36 @@ function Designer() {
             <stop offset="100%" stopColor={chainStops.c} />
           </linearGradient>
         </defs>
-        <path
-          d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
-          fill="none"
-          stroke="rgba(0,0,0,0.25)"
-          strokeWidth={ropeWidth + 0.15}
-          strokeLinecap="round"
-          transform="translate(0,0.6)"
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
-          fill="none"
-          stroke="url(#chain)"
-          strokeWidth={ropeWidth}
-          strokeLinecap="round"
-          strokeDasharray="0.5 0.35"
-        />
+        {chainStyle === "rope" ? (
+          <>
+            <path
+              d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
+              fill="none"
+              stroke="rgba(0,0,0,0.25)"
+              strokeWidth={ropeWidth + 0.15}
+              strokeLinecap="round"
+              transform="translate(0,0.6)"
+              vectorEffect="non-scaling-stroke"
+            />
+            <path
+              d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
+              fill="none"
+              stroke="url(#chain)"
+              strokeWidth={ropeWidth}
+              strokeLinecap="round"
+              strokeDasharray="0.5 0.35"
+            />
+          </>
+        ) : (
+          <PaperclipChain
+            leftX={chainLeftX}
+            rightX={chainRightX}
+            y={chainY}
+            dip={chainDip}
+            color={chainColor}
+            baseWidth={ropeWidth}
+          />
+        )}
       </svg>
       {placed.filter((p) => p.category !== "stone").map((p) => renderPlaced(p))}
       {placed.filter((p) => p.category === "stone").map((p) => renderPlaced(p))}
@@ -1642,6 +1661,24 @@ function Designer() {
                       }}
                     />
                     {c === "gold" ? "Altın" : "Gümüş"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[10px] uppercase tracking-widest text-stone-600">Tip</span>
+              <div className="flex gap-2">
+                {(["rope", "paperclip"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setChainStyle(s)}
+                    className={`rounded-md border px-3 py-1 text-[11px] font-medium transition ${
+                      chainStyle === s
+                        ? "border-stone-700 bg-stone-900 text-white"
+                        : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                    }`}
+                  >
+                    {s === "rope" ? "Klasik" : "Ataç"}
                   </button>
                 ))}
               </div>

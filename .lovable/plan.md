@@ -1,30 +1,85 @@
-## iyzico Ödeme Entegrasyonu
+# Paperclip Chain (Ataç Zincir) Ekleme Planı
 
-iyzico için Lovable'ın hazır bir connector'ı yok, bu yüzden API kimlik bilgileriyle özel bir entegrasyon kuracağız. Backend (Lovable Cloud) gerekli.
+## Mevcut mimari (analiz)
 
-### Akış
+**1. Zincir nasıl render ediliyor?**
+- Teknoloji: **SVG** (Canvas/WebGL değil). `src/routes/index.tsx` satır 1219-1249'da, `viewBox="0 0 100 100"` koordinat sisteminde tek bir quadratic Bézier path (`M leftX,Y Q midX,dip rightX,Y`) çiziliyor.
+- İki path üst üste: alt path gölge (siyah, hafif aşağıda), üst path `url(#chain)` linear gradient ile boyanıyor.
+- Renk gradient stop'ları `chainStops` ile `chainColor` (`"silver" | "gold"`) durumuna göre seçiliyor (satır 540-543).
+- Silver/Gold farkı tek çizgi + dashed stroke (`strokeDasharray="0.5 0.35"`) ile elde edilmiş.
 
-1. **Lovable Cloud'u etkinleştir** (zaten açık değilse) — server function'ları çalıştırmak için.
-2. **Secret'ları ekle** (`add_secret` ile, kullanıcı güvenli form üzerinden girer):
-   - `IYZICO_API_KEY`
-   - `IYZICO_SECRET_KEY`
-   - `IYZICO_BASE_URL` (sandbox: `https://sandbox-api.iyzipay.com`, prod: `https://api.iyzipay.com`)
-3. **Checkout Form Initialize server function** (`src/lib/iyzico.functions.ts`):
-   - Sepet/tutar bilgisini alır, iyzico'nun PKI imzasını üretir, `/payment/iyzipos/checkoutform/initialize/auth/ecom` endpoint'ine POST atar.
-   - Dönen `paymentPageUrl` veya `checkoutFormContent` (script) frontend'e döner.
-4. **Callback route** (`src/routes/api/public/iyzico-callback.ts`):
-   - iyzico ödeme sonrası kullanıcıyı buraya yönlendirir; `token` ile `/payment/iyzipos/checkoutform/auth/ecom/detail` çağrılır, sonuç doğrulanır ve siparişi DB'de "ödendi" olarak işaretler.
-   - `/api/public/*` altında çünkü iyzico dışarıdan çağırır; içerde HMAC/imza doğrulaması yapılır.
-5. **Frontend ödeme butonu**: Mevcut sepet/sipariş ekranına bir "iyzico ile Öde" butonu — `useServerFn(initializeIyzicoCheckout)` ile çağırır, dönen URL'ye yönlendirir veya inline form'u render eder.
-6. **Sipariş tablosu** (henüz yoksa): `orders` tablosu (`id`, `user_id`, `amount`, `currency`, `status`, `iyzico_token`, `iyzico_payment_id`, `created_at`) + RLS politikaları + GRANT'lar.
+**2. Charm'lar zincire nasıl yerleştiriliyor?**
+- `Placed` tipinde `t` (0..1, Bézier üzerinde parametre) tutuluyor.
+- `curvePoint(t, lx, rx, y, dip)` fonksiyonu (satır 242-247) aynı quadratic Bézier formülünü kullanarak charm/taş ekran konumunu hesaplıyor.
+- Yani zincir görseli ile charm konumu **aynı eğri denklemini** paylaşıyor. Charm'lar absolute pozisyonlu DOM elementleri olarak SVG'nin üstünde render ediliyor (satır 1250-1251).
 
-### Açıklığa kavuşturulması gereken noktalar
+**3. State / persistence**
+- `chainColor` state'i: `src/routes/index.tsx` (satır 301).
+- Persist edilen yerler:
+  - `src/lib/design-storage.ts` (tip: `"silver" | "gold"`)
+  - `src/lib/saved-designs.functions.ts` (Zod: `z.enum(["silver","gold"])`)
+  - `src/components/DesignThumbnail.tsx` (renk haritası)
 
-Devam etmeden önce şunları netleştirmem gerekiyor:
+## Önerilen yaklaşım
 
-1. **Sandbox mı yoksa canlı (production) iyzico hesabı mı** kullanacaksın? (Önerim: önce sandbox ile test, sonra prod.)
-2. **Ne satılıyor?** Tek seferlik kolye/takı satışı mı, yoksa abonelik de var mı? (Şu an proje takı tasarım aracı — varsayım: tek seferlik sepet ödemesi.)
-3. **Sipariş kaydı için DB tablosu** kurulsun mu, yoksa sadece ödeme alıp e-postayla mı bildirim istiyorsun?
-4. **Para birimi**: TRY varsayıyorum, doğru mu?
+Mimariyi bozmamak için **eğri matematiğini değiştirmiyoruz**. Yalnızca zincirin görsel render katmanına bir varyant ekliyoruz; charm konumlandırma (`curvePoint`) ve `Placed.t` semantiği aynı kalıyor — bu da Gold/Silver tasarımlarının ve kayıtlı/draft tasarımların geriye dönük çalışmasını garanti eder.
 
-Cevapların geldikten sonra planı netleştirip uygulamaya geçerim.
+### Teknik yaklaşım: SVG `<pattern>` + halka şablonu, eğri üzerinde dağıtım
+
+İki yaygın seçenekten en performanslısı:
+
+- **Seçenek A (önerilen): `<use>` ile halka kopyalama eğri boyunca.**
+  Bir kez `<symbol id="paperclip-link">` (oval halka — iki concentric rounded rect, gradient stroke) tanımla. Component mount'ta veya `useMemo` ile, mevcut quadratic Bézier'i N parçaya böl (örn. arc-length ≈ `chainRightX - chainLeftX` ölçeğine bağlı, ~28-40 halka). Her halka için `t_i`'de `curvePoint` ile (x,y) ve teğet açısı hesaplanır, sonra `<use href="#paperclip-link" transform={`translate(x y) rotate(angle) scale(s)`} />` olarak çizilir. Komşu halkalar 90° dönüşümlü olur (gerçek paperclip görünümü).
+  - Avantaj: tek SVG sembolü + N adet hafif `<use>` node → mobilde ucuz, GPU dostu.
+  - Dezavantaj: Gerçek arc-length değil parametrik t kullandığımız için orta noktada hafif sıkışma olabilir; pratikte fark gözle görünmez çünkü dip aralığı küçük. İstenirse basit bir arc-length yaklaşımı (10 örnekleme + cumulative length) eklenir.
+
+- Seçenek B: `<path>` üzerine `strokeDasharray` ile özel desen + paralel ikinci offset path. Daha ucuz ama gerçek halka görünümü zayıf.
+
+→ **Seçenek A'yı uyguluyoruz.**
+
+### Halka tasarımı
+
+`<symbol id="paperclip-link" viewBox="-10 -4 20 8">` içinde:
+- Dış oval: `<rect x="-9" y="-3" width="18" height="6" rx="3" />` stroke gradient, fill yok.
+- İç highlight: ikinci ince stroke veya `<rect>` daha açık tonla, üst kenarda.
+- Gradient `<linearGradient id="paperclip-gold/silver">` — mevcut `chainStops` mantığı yeniden kullanılır.
+
+Halka boyutu zincirin `ropeWidth` ölçeğine ve SVG viewBox (0..100) birimine göre küçük tutulur (genişlik ≈ 2.2, yükseklik ≈ 0.9 viewBox birimi → mevcut çizginin yaklaşık 2× kalınlığı).
+
+### Değişecek dosyalar
+
+1. **`src/lib/design-storage.ts`** — `chainColor` tipini genişlet:
+   `chainColor: "silver" | "gold" | "paperclip-gold" | "paperclip-silver"`
+   (Veya daha temiz: ayrı `chainStyle: "rope" | "paperclip"` + `chainColor: "silver" | "gold"`. Aşağıda bunu öneriyoruz — geriye dönük uyumlu, draft hydration mevcut kayıtları "rope" varsayar.)
+
+2. **`src/lib/saved-designs.functions.ts`** — Zod şemasına yeni opsiyonel alan:
+   `chainStyle: z.enum(["rope","paperclip"]).optional().default("rope")`
+
+3. **`src/routes/index.tsx`**
+   - Yeni state: `const [chainStyle, setChainStyle] = useState<"rope"|"paperclip">("rope")`.
+   - Draft hydration / save / `currentDesign` / `loadFromGallery` bloklarına `chainStyle` eklenir.
+   - `canvasInner` içindeki SVG: mevcut iki `<path>` `chainStyle === "rope"` koşuluna alınır; `chainStyle === "paperclip"` ise yeni `<PaperclipChain leftX={...} rightX={...} y={...} dip={...} color={chainColor} />` bileşeni render edilir.
+   - Yeni yardımcı (aynı dosyada veya `src/components/PaperclipChain.tsx`):
+     - `useMemo` ile halka sayısını uzaklığa göre hesapla (örn. `Math.round((chainRightX - chainLeftX) * 0.45)` ~ 30 halka).
+     - Her halka için t'de `curvePoint` + teğet açısı ( türev: `dx/dt = 2(1-t)(cx-lx) + 2t(rx-cx)`; `dy/dt = 2(1-t)(dip-y) + 2t(y-dip)` ; `angle = atan2(dy,dx)`).
+     - Tek `<symbol>` + N `<use>` üretir.
+   - UI: Zincir paneline üçüncü bir buton ekle ("Ataç"). Renk seçimi (altın/gümüş) aynı kalır — paperclip moda da uygulanır.
+
+4. **`src/components/DesignThumbnail.tsx`** — thumbnail'de basit destek: `chainStyle === "paperclip"` ise stroke yerine `strokeDasharray` ile yaklaşık halka deseni (thumbnail küçük; tam halka rendering gereksiz). Tip güncellenir.
+
+### Mobil performans notları
+
+- ~30-40 `<use>` SVG node mobil için sorunsuz; React tarafında `useMemo` ile sadece slider değiştiğinde yeniden hesaplanır.
+- Halka pozisyonları render anında hesaplanır, animasyon/RAF yok → reflow maliyeti minimum.
+- `vectorEffect="non-scaling-stroke"` kullanılır; CSS transform yok.
+- Pointer/charm event'leri SVG `pointer-events: none` olduğundan etkilenmez; charm yerleştirme aynı `curvePoint` üzerinden devam ettiği için davranış değişmez.
+
+### Geriye dönük uyumluluk
+
+- Eski draft / kayıtlı tasarımlarda `chainStyle` yoksa varsayılan `"rope"` → mevcut Gold/Silver görünüm aynen korunur.
+- `Placed.t` semantiği değişmediği için tüm var olan kayıtlar paperclip'e geçildiğinde de doğru noktalarda durur.
+
+## Riskler
+
+- Halkaların eğri üzerinde eşit aralıklı görünmesi için (basit t-dağılımı yerine) küçük bir arc-length yaklaşımı gerekebilir; ilk sürümde gözle test edip gerekirse 10 örneklemeli cumulative-length adımı eklenir.
+- Mobilde çok yüksek halka sayısı (>60) seçilirse FPS düşebilir → üst sınır 40.

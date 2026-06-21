@@ -8,6 +8,7 @@ export type DesignState = {
   chainRightX: number;
   chainY: number;
   chainColor: "silver" | "gold";
+  chainStyle?: "rope" | "paperclip";
   lightEnabled?: boolean;
   lightIntensity?: number;
 };

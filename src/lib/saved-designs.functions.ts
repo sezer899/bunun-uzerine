@@ -10,6 +10,7 @@ const designSchema = z.object({
   chainRightX: z.number(),
   chainY: z.number(),
   chainColor: z.enum(["silver", "gold"]),
+  chainStyle: z.enum(["rope", "paperclip"]).optional(),
 });
 
 function deriveAuthorLabel(email: string | null | undefined): string {

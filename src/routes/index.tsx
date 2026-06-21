@@ -1665,6 +1665,24 @@ function Designer() {
                 ))}
               </div>
             </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[10px] uppercase tracking-widest text-stone-600">Tip</span>
+              <div className="flex gap-2">
+                {(["rope", "paperclip"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setChainStyle(s)}
+                    className={`rounded-md border px-3 py-1 text-[11px] font-medium transition ${
+                      chainStyle === s
+                        ? "border-stone-700 bg-stone-900 text-white"
+                        : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                    }`}
+                  >
+                    {s === "rope" ? "Klasik" : "Ataç"}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <SliderRow label="Sarkma derinliği" min={70} max={110} value={chainDip} onChange={setChainDip} />
             <SliderRow label="Sol uç X" min={5} max={40} value={chainLeftX} onChange={setChainLeftX} />

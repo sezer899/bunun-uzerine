@@ -295,9 +295,9 @@ function Designer() {
     lastTapRef.current = { uid, time: now };
     return false;
   };
-  const [chainDip, setChainDip] = useState(90);
+  const [chainDip, setChainDip] = useState(88);
   const [chainLeftX, setChainLeftX] = useState(9);
-  const [chainRightX, setChainRightX] = useState(92);
+  const [chainRightX, setChainRightX] = useState(91);
   const [chainY, setChainY] = useState(52);
   const [chainColor, setChainColor] = useState<"silver" | "gold">("silver");
   const [chainStyle, setChainStyle] = useState<"rope" | "paperclip">("rope");
@@ -306,7 +306,7 @@ function Designer() {
   const isMobile = useIsMobile();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [lightEnabled, setLightEnabled] = useState(true);
-  const [lightIntensity, setLightIntensity] = useState(1);
+  const [lightIntensity, setLightIntensity] = useState(0.65);
   const draftHydratedRef = useRef(false);
 
   // İlk mount'ta yerel taslağı sessizce geri yükle (varsa).

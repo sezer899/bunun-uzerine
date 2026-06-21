@@ -63,9 +63,9 @@ export function PaperclipChain({
 
     // Gerçek paperclip zincir: halkalar uç uca dizilir, bireysel olarak
     // okunur. Hafif boşluk bırakılır (referans fotoğraf).
-    const linkLen = 2.6; // major axis (viewBox birimi)
-    const step = linkLen * 0.95; // ~5% çakışma: uçlar değer ama örtüşmez
-    const n = Math.max(6, Math.min(60, Math.floor(total / step)));
+    const linkLen = 3.0; // major axis (viewBox birimi)
+    const step = linkLen * 0.92; // ~8% örtüşme: uçlar birbirine geçer ama halka bütünlüğü okunur
+    const n = Math.max(6, Math.min(50, Math.floor(total / step)));
     // Halkaları eğri boyunca ortala
     const used = (n - 1) * step;
     const startOffset = (total - used) / 2;
@@ -90,7 +90,6 @@ export function PaperclipChain({
   // Halka ölçeği (SVG viewBox 0..100). Sembol -10..10 x -2.7..2.7 (aspect ~3.7:1).
   // Uzunluk: linkLen/20 ölçeği ile küçültülür.
   const linkScale = links.linkLen / 20;
-  const stroke = baseWidth * 1.4; // okunur halka kalınlığı
 
   return (
     <>
@@ -110,10 +109,9 @@ export function PaperclipChain({
             rx={2.7}
             ry={2.7}
             fill="none"
-            stroke="rgba(0,0,0,0.22)"
-            strokeWidth={(stroke / linkScale) + 0.4}
-            vectorEffect="non-scaling-stroke"
-            transform="translate(0,0.5)"
+            stroke="rgba(0,0,0,0.20)"
+            strokeWidth={0.9}
+            transform="translate(0,0.45)"
           />
           {/* ana halka */}
           <rect
@@ -125,22 +123,20 @@ export function PaperclipChain({
             ry={2.7}
             fill="none"
             stroke={`url(#${id}-grad)`}
-            strokeWidth={stroke / linkScale}
-            vectorEffect="non-scaling-stroke"
+            strokeWidth={0.65}
           />
-          {/* çok hafif iç highlight */}
+          {/* çok hafif iç highlight — üst kenarda */}
           <rect
-            x={-9.6}
-            y={-2.3}
-            width={19.2}
-            height={4.6}
-            rx={2.3}
-            ry={2.3}
+            x={-9.7}
+            y={-2.4}
+            width={19.4}
+            height={4.8}
+            rx={2.4}
+            ry={2.4}
             fill="none"
             stroke={stops.b}
-            strokeOpacity={0.25}
-            strokeWidth={0.35}
-            vectorEffect="non-scaling-stroke"
+            strokeOpacity={0.45}
+            strokeWidth={0.22}
           />
         </symbol>
       </defs>

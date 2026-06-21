@@ -295,9 +295,9 @@ function Designer() {
     lastTapRef.current = { uid, time: now };
     return false;
   };
-  const [chainDip, setChainDip] = useState(90);
+  const [chainDip, setChainDip] = useState(88);
   const [chainLeftX, setChainLeftX] = useState(9);
-  const [chainRightX, setChainRightX] = useState(92);
+  const [chainRightX, setChainRightX] = useState(91);
   const [chainY, setChainY] = useState(52);
   const [chainColor, setChainColor] = useState<"silver" | "gold">("silver");
   const [chainStyle, setChainStyle] = useState<"rope" | "paperclip">("rope");
@@ -306,7 +306,7 @@ function Designer() {
   const isMobile = useIsMobile();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [lightEnabled, setLightEnabled] = useState(true);
-  const [lightIntensity, setLightIntensity] = useState(1);
+  const [lightIntensity, setLightIntensity] = useState(0.65);
   const draftHydratedRef = useRef(false);
 
   // İlk mount'ta yerel taslağı sessizce geri yükle (varsa).
@@ -737,6 +737,17 @@ function Designer() {
     }
   }, [stoneCount, seenTips.stoneDelete]);
 
+  const stonesLocked = chainStyle === "paperclip";
+  const stonesLockedMessage = "Taş eklemek için zincir tipini Misina olarak değiştirmelisiniz.";
+  useEffect(() => {
+    if (chainStyle === "paperclip" && !seenTips.paperclipInfo) {
+      setInfoBubble({
+        text: "Zincire sadece charm ve takı parçaları eklenebilir.",
+        seenKey: "paperclipInfo",
+      });
+    }
+  }, [chainStyle, seenTips.paperclipInfo]);
+
 
 
   // stones expand outward in the order [0, -1, +1, -2, +2, ...] with
@@ -831,6 +842,11 @@ function Designer() {
   // Click-to-add: stones thread onto the chain; charms float freely.
   const addToChain = (item: Item, stoneSize?: number) => {
     const stoneScale = item.category === "stone" && stoneSize ? STONE_SIZE_SCALE[stoneSize] : undefined;
+
+    if (item.category === "stone" && stonesLocked) {
+      setWarning(stonesLockedMessage);
+      return;
+    }
 
     if (item.category !== "stone") {
       snapshot();
@@ -1369,7 +1385,14 @@ function Designer() {
       <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:gap-6 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)_200px]">
         {/* Left tray — stones (desktop) */}
         <div className="hidden lg:block">
-          <Tray title="Taşlar" items={stones} onDragStart={setDraggingNew} onPick={addToChain} />
+          <Tray
+            title="Taşlar"
+            items={stones}
+            onDragStart={setDraggingNew}
+            onPick={addToChain}
+            disabled={stonesLocked}
+            onDisabledAttempt={() => setWarning(stonesLockedMessage)}
+          />
         </div>
 
         {/* Center — model */}
@@ -1577,8 +1600,14 @@ function Designer() {
           <div className="sticky top-[60px] z-20 -mx-3 mt-3 border-y border-stone-300/60 bg-white/95 px-3 py-2 backdrop-blur lg:hidden">
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => setTrayOpen((t) => (t === "stones" ? null : "stones"))}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium active:scale-[0.98] ${trayOpen === "stones" ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 bg-white text-stone-800"}`}
+                onClick={() => {
+                  if (stonesLocked) {
+                    setWarning(stonesLockedMessage);
+                    return;
+                  }
+                  setTrayOpen((t) => (t === "stones" ? null : "stones"));
+                }}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium active:scale-[0.98] ${trayOpen === "stones" ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 bg-white text-stone-800"} ${stonesLocked ? "opacity-50" : ""}`}
               >
                 Taşlar
               </button>
@@ -1639,7 +1668,7 @@ function Designer() {
 
           <div className="mt-3 space-y-2 rounded-xl border border-stone-300 bg-white/80 p-3 backdrop-blur">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-[10px] uppercase tracking-widest text-stone-600">Zincir</span>
+              <span className="text-[10px] uppercase tracking-widest text-stone-600">Renk</span>
               <div className="flex gap-2">
                 {(["silver", "gold"] as const).map((c) => (
                   <button
@@ -1678,7 +1707,7 @@ function Designer() {
                         : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
                     }`}
                   >
-                    {s === "rope" ? "Klasik" : "Ataç"}
+                    {s === "rope" ? "Misina" : "Zincir"}
                   </button>
                 ))}
               </div>
@@ -1849,6 +1878,8 @@ function Designer() {
                 addToChain(it, stoneSize);
               }}
               variant="sheet"
+              disabled={trayOpen === "stones" && stonesLocked}
+              onDisabledAttempt={() => setWarning(stonesLockedMessage)}
             />
           </div>
         </div>
@@ -1903,18 +1934,42 @@ function Tray({
   onDragStart,
   onPick,
   variant,
+  disabled,
+  onDisabledAttempt,
 }: {
   title: string;
   items: Item[];
   onDragStart: (i: Item) => void;
   onPick: (i: Item, stoneSize?: number) => void;
   variant?: "sheet" | "default";
+  disabled?: boolean;
+  onDisabledAttempt?: () => void;
 }) {
   const isStoneTray = items.length > 0 && items.every((it) => it.category === "stone");
   const inSheet = variant === "sheet";
 
   return (
-    <aside className={inSheet ? "" : "self-start rounded-xl border border-stone-300 bg-white/80 p-3 shadow-sm backdrop-blur"}>
+    <aside
+      className={`${inSheet ? "" : "self-start rounded-xl border border-stone-300 bg-white/80 p-3 shadow-sm backdrop-blur"} ${disabled ? "opacity-50" : ""}`}
+      onPointerDownCapture={
+        disabled
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDisabledAttempt?.();
+            }
+          : undefined
+      }
+      onClickCapture={
+        disabled
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDisabledAttempt?.();
+            }
+          : undefined
+      }
+    >
       <h2 className="mb-2 px-1 font-serif text-sm uppercase tracking-[0.18em] text-stone-600">
         {title}
       </h2>
@@ -1925,13 +1980,17 @@ function Tray({
         {items.map((it) => (
           <div
             key={it.id}
-            className={`group flex flex-col items-center gap-1 rounded-lg border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100 p-2 transition hover:border-stone-400 hover:from-white hover:shadow-md ${inSheet ? "w-24 shrink-0" : ""}`}
+            className={`group flex flex-col items-center gap-1 rounded-lg border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100 p-2 transition hover:border-stone-400 hover:from-white hover:shadow-md ${inSheet ? "w-24 shrink-0" : ""} ${disabled ? "cursor-not-allowed" : ""}`}
             title={`${it.name} — ${it.price} ₺`}
           >
             <div
-              draggable
-              onDragStart={() => onDragStart(it)}
+              draggable={!disabled}
+              onDragStart={() => {
+                if (disabled) return;
+                onDragStart(it);
+              }}
               onClick={() => {
+                if (disabled) return;
                 if (!isStoneTray) onPick(it);
               }}
               className={`flex w-full flex-col items-center gap-0.5 ${isStoneTray ? "cursor-grab" : "cursor-pointer active:scale-95"}`}

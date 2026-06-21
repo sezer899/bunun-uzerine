@@ -11,6 +11,7 @@ import {
   type PartDTO,
 } from "@/lib/wix.functions";
 import { SavedDesignsDialog } from "@/components/SavedDesignsDialog";
+import { PaperclipChain } from "@/components/PaperclipChain";
 import { loadDraft, saveDraft, clearDraft, type DesignState } from "@/lib/design-storage";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -299,6 +300,7 @@ function Designer() {
   const [chainRightX, setChainRightX] = useState(91);
   const [chainY, setChainY] = useState(45);
   const [chainColor, setChainColor] = useState<"silver" | "gold">("silver");
+  const [chainStyle, setChainStyle] = useState<"rope" | "paperclip">("rope");
   const [trayOpen, setTrayOpen] = useState<null | "stones" | "charms" | "parts">(null);
   const [zoom, setZoom] = useState(1);
   const isMobile = useIsMobile();
@@ -319,6 +321,7 @@ function Designer() {
     if (typeof d.chainRightX === "number") setChainRightX(d.chainRightX);
     if (typeof d.chainY === "number") setChainY(d.chainY);
     if (d.chainColor === "gold" || d.chainColor === "silver") setChainColor(d.chainColor);
+    if (d.chainStyle === "rope" || d.chainStyle === "paperclip") setChainStyle(d.chainStyle);
     if (typeof d.lightEnabled === "boolean") setLightEnabled(d.lightEnabled);
     if (typeof d.lightIntensity === "number") setLightIntensity(d.lightIntensity);
   }, []);
@@ -327,10 +330,10 @@ function Designer() {
   useEffect(() => {
     if (!draftHydratedRef.current) return;
     const t = setTimeout(() => {
-      saveDraft({ placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, lightEnabled, lightIntensity });
+      saveDraft({ placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, chainStyle, lightEnabled, lightIntensity });
     }, 400);
     return () => clearTimeout(t);
-  }, [placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, lightEnabled, lightIntensity]);
+  }, [placed, chainDip, chainLeftX, chainRightX, chainY, chainColor, chainStyle, lightEnabled, lightIntensity]);
 
   const currentDesign: DesignState = {
     placed,
@@ -339,6 +342,7 @@ function Designer() {
     chainRightX,
     chainY,
     chainColor,
+    chainStyle,
     lightEnabled,
     lightIntensity,
   };
@@ -350,6 +354,8 @@ function Designer() {
     if (typeof d.chainRightX === "number") setChainRightX(d.chainRightX);
     if (typeof d.chainY === "number") setChainY(d.chainY);
     if (d.chainColor === "gold" || d.chainColor === "silver") setChainColor(d.chainColor);
+    if (d.chainStyle === "rope" || d.chainStyle === "paperclip") setChainStyle(d.chainStyle);
+    else setChainStyle("rope");
     if (typeof d.lightEnabled === "boolean") setLightEnabled(d.lightEnabled);
     if (typeof d.lightIntensity === "number") setLightIntensity(d.lightIntensity);
     setSelectedUid(null);

@@ -1235,23 +1235,36 @@ function Designer() {
             <stop offset="100%" stopColor={chainStops.c} />
           </linearGradient>
         </defs>
-        <path
-          d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
-          fill="none"
-          stroke="rgba(0,0,0,0.25)"
-          strokeWidth={ropeWidth + 0.15}
-          strokeLinecap="round"
-          transform="translate(0,0.6)"
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
-          fill="none"
-          stroke="url(#chain)"
-          strokeWidth={ropeWidth}
-          strokeLinecap="round"
-          strokeDasharray="0.5 0.35"
-        />
+        {chainStyle === "rope" ? (
+          <>
+            <path
+              d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
+              fill="none"
+              stroke="rgba(0,0,0,0.25)"
+              strokeWidth={ropeWidth + 0.15}
+              strokeLinecap="round"
+              transform="translate(0,0.6)"
+              vectorEffect="non-scaling-stroke"
+            />
+            <path
+              d={`M ${chainLeftX},${chainY} Q ${(chainLeftX + chainRightX) / 2},${chainDip} ${chainRightX},${chainY}`}
+              fill="none"
+              stroke="url(#chain)"
+              strokeWidth={ropeWidth}
+              strokeLinecap="round"
+              strokeDasharray="0.5 0.35"
+            />
+          </>
+        ) : (
+          <PaperclipChain
+            leftX={chainLeftX}
+            rightX={chainRightX}
+            y={chainY}
+            dip={chainDip}
+            color={chainColor}
+            baseWidth={ropeWidth}
+          />
+        )}
       </svg>
       {placed.filter((p) => p.category !== "stone").map((p) => renderPlaced(p))}
       {placed.filter((p) => p.category === "stone").map((p) => renderPlaced(p))}

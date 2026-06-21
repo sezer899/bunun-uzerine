@@ -1,85 +1,75 @@
-# Paperclip Chain (Ataç Zincir) Ekleme Planı
+# Paperclip Chain İnceltme + Klasik Zincir Öntanımlı Değerler
 
-## Mevcut mimari (analiz)
+## 1. `src/components/PaperclipChain.tsx` — narin/dainty stil
 
-**1. Zincir nasıl render ediliyor?**
-- Teknoloji: **SVG** (Canvas/WebGL değil). `src/routes/index.tsx` satır 1219-1249'da, `viewBox="0 0 100 100"` koordinat sisteminde tek bir quadratic Bézier path (`M leftX,Y Q midX,dip rightX,Y`) çiziliyor.
-- İki path üst üste: alt path gölge (siyah, hafif aşağıda), üst path `url(#chain)` linear gradient ile boyanıyor.
-- Renk gradient stop'ları `chainStops` ile `chainColor` (`"silver" | "gold"`) durumuna göre seçiliyor (satır 540-543).
-- Silver/Gold farkı tek çizgi + dashed stroke (`strokeDasharray="0.5 0.35"`) ile elde edilmiş.
+Mevcut `linkLen = 2.6` ve sembol viewport'u `20×6`. İstenen değişiklikler somut sayılara çevrilince:
 
-**2. Charm'lar zincire nasıl yerleştiriliyor?**
-- `Placed` tipinde `t` (0..1, Bézier üzerinde parametre) tutuluyor.
-- `curvePoint(t, lx, rx, y, dip)` fonksiyonu (satır 242-247) aynı quadratic Bézier formülünü kullanarak charm/taş ekran konumunu hesaplıyor.
-- Yani zincir görseli ile charm konumu **aynı eğri denklemini** paylaşıyor. Charm'lar absolute pozisyonlu DOM elementleri olarak SVG'nin üstünde render ediliyor (satır 1250-1251).
+- **Halka boyutu %40 küçük**: `linkLen` 2.6 → **1.56**. Bu halka sayısını otomatik olarak ~1.66× artırır (arc-length tabanlı dağıtım), yani daha çok ve daha küçük halka.
+- **Yükseklik daha az** (uzunluk korunur, oval daha ince): sembol `rect` boyutu `20×6` → `20×3.6` (yükseklik %40 azaldı). `rx/ry` 3 → 1.8. `linkScale` hesabı `linkLen/20` zaten uzunluğu sürer; sadece `scale(linkScale, linkScale)` yerine yükseklikte ek çarpan **kaldırılıyor** (alt halkalar için `0.55` çarpanı vardı — kaldır). Tüm halkalar aynı ince oval olur.
+- **Stroke kalınlığı %50 azalt**: ana stroke `stroke / linkScale + 0.05` → yarıya. Yeni hesap: `(stroke * 0.5) / linkScale + 0.02`. Gölge stroke `+ 0.35` → `+ 0.15`. Highlight stroke 0.5 → 0.25.
+- **Komşu halkalar daha sıkı**: `step = linkLen * 0.72` → `linkLen * 0.55`. Halkalar uçlarından belirgin örtüşür → "fiziksel olarak geçmiş" hissi.
+- **Bevel/3D efekti hafifle**:
+  - Gradient yönü `x1=0 y1=0 x2=0 y2=1` (sert dikey bevel) → `x1=0 y1=0 x2=1 y2=0.4` (yumuşak yatay highlight).
+  - Renk stop'ları daha sade: gold `{ a: "#a07626", b: "#f4e0a3", c: "#b8852a" }`, silver `{ a: "#9aa0a6", b: "#eef0f2", c: "#a3a8af" }`. Tek ton bandı; aşırı parlama yok.
+  - İç highlight opaklığı 0.55 → 0.35.
+  - Gölge alpha 0.28 → 0.18; offset `translate(0,0.7)` → `translate(0,0.3)`.
+- **Alt-halka 90° dönüş özelliği** (`alt: i % 2 === 1` ve `* 0.55` y-ölçeği) **kaldırılır** — gerçek paperclip zincirlerinde halkalar aynı yönde sıralanır.
+- **Üst sınır**: `n` max 48 → 80 (daha küçük halka × daha kalabalık zincir). Min: 10. Mobil performans için yeterli (`<use>` ucuz).
 
-**3. State / persistence**
-- `chainColor` state'i: `src/routes/index.tsx` (satır 301).
-- Persist edilen yerler:
-  - `src/lib/design-storage.ts` (tip: `"silver" | "gold"`)
-  - `src/lib/saved-designs.functions.ts` (Zod: `z.enum(["silver","gold"])`)
-  - `src/components/DesignThumbnail.tsx` (renk haritası)
+Yeni `links` üretimi aynı arc-length örnekleme mantığını korur (`SAMPLES=40`); sadece `linkLen` ve `step` değişir. Charm yerleşimini etkilemez — bu hâlâ yalnızca görsel katmandır.
 
-## Önerilen yaklaşım
+## 2. `src/routes/index.tsx` — klasik zincir öntanımlı slider değerleri
 
-Mimariyi bozmamak için **eğri matematiğini değiştirmiyoruz**. Yalnızca zincirin görsel render katmanına bir varyant ekliyoruz; charm konumlandırma (`curvePoint`) ve `Placed.t` semantiği aynı kalıyor — bu da Gold/Silver tasarımlarının ve kayıtlı/draft tasarımların geriye dönük çalışmasını garanti eder.
+Mevcut başlangıç state'leri:
 
-### Teknik yaklaşım: SVG `<pattern>` + halka şablonu, eğri üzerinde dağıtım
+```ts
+const [chainDip, setChainDip] = useState(90);     // ✓ zaten 90
+const [chainLeftX, setChainLeftX] = useState(9);  // ✓ zaten 9
+const [chainRightX, setChainRightX] = useState(91); // → 92
+const [chainY, setChainY] = useState(45);         // → 52
+```
 
-İki yaygın seçenekten en performanslısı:
+Sadece iki sayı değişir: `chainRightX` 91→**92**, `chainY` 45→**52**.
 
-- **Seçenek A (önerilen): `<use>` ile halka kopyalama eğri boyunca.**
-  Bir kez `<symbol id="paperclip-link">` (oval halka — iki concentric rounded rect, gradient stroke) tanımla. Component mount'ta veya `useMemo` ile, mevcut quadratic Bézier'i N parçaya böl (örn. arc-length ≈ `chainRightX - chainLeftX` ölçeğine bağlı, ~28-40 halka). Her halka için `t_i`'de `curvePoint` ile (x,y) ve teğet açısı hesaplanır, sonra `<use href="#paperclip-link" transform={`translate(x y) rotate(angle) scale(s)`} />` olarak çizilir. Komşu halkalar 90° dönüşümlü olur (gerçek paperclip görünümü).
-  - Avantaj: tek SVG sembolü + N adet hafif `<use>` node → mobilde ucuz, GPU dostu.
-  - Dezavantaj: Gerçek arc-length değil parametrik t kullandığımız için orta noktada hafif sıkışma olabilir; pratikte fark gözle görünmez çünkü dip aralığı küçük. İstenirse basit bir arc-length yaklaşımı (10 örnekleme + cumulative length) eklenir.
+Not: Bu değerler ilk mount için varsayılan; mevcut localStorage taslağı varsa override edilir (draft hydration). Yeni kullanıcı / taslak yokken istenen 90/9/92/52 değerleri uygulanır.  
+  
+Paperclip Chain iyileştirmelerine ek olarak:
 
-- Seçenek B: `<path>` üzerine `strokeDasharray` ile özel desen + paralel ikinci offset path. Daha ucuz ama gerçek halka görünümü zayıf.
+Bağlantı hissini artır.
 
-→ **Seçenek A'yı uyguluyoruz.**
+Şu an halkalar yan yana dizilmiş görünüyor.
 
-### Halka tasarımı
+İstediğim görünüm:
 
-`<symbol id="paperclip-link" viewBox="-10 -4 20 8">` içinde:
-- Dış oval: `<rect x="-9" y="-3" width="18" height="6" rx="3" />` stroke gradient, fill yok.
-- İç highlight: ikinci ince stroke veya `<rect>` daha açık tonla, üst kenarda.
-- Gradient `<linearGradient id="paperclip-gold/silver">` — mevcut `chainStops` mantığı yeniden kullanılır.
+- Her halka bir sonraki halkanın içinden geçmiş gibi görünmeli.
+- Komşu halkalar yaklaşık %25-35 oranında üst üste binsin.
+- Zincir tek bir bütün gibi algılansın.
+- Ayrık zincir halkaları görüntüsünden kaçınılsın.
 
-Halka boyutu zincirin `ropeWidth` ölçeğine ve SVG viewBox (0..100) birimine göre küçük tutulur (genişlik ≈ 2.2, yükseklik ≈ 0.9 viewBox birimi → mevcut çizginin yaklaşık 2× kalınlığı).
+Render sırası:
 
-### Değişecek dosyalar
+- Çift indeksli halkalar önce çizilsin.
+- Tek indeksli halkalar sonra çizilsin.
 
-1. **`src/lib/design-storage.ts`** — `chainColor` tipini genişlet:
-   `chainColor: "silver" | "gold" | "paperclip-gold" | "paperclip-silver"`
-   (Veya daha temiz: ayrı `chainStyle: "rope" | "paperclip"` + `chainColor: "silver" | "gold"`. Aşağıda bunu öneriyoruz — geriye dönük uyumlu, draft hydration mevcut kayıtları "rope" varsayar.)
+Böylece halkaların birbirinin içinden geçtiği hissi oluşsun.
 
-2. **`src/lib/saved-designs.functions.ts`** — Zod şemasına yeni opsiyonel alan:
-   `chainStyle: z.enum(["rope","paperclip"]).optional().default("rope")`
+Alternatif olarak:
 
-3. **`src/routes/index.tsx`**
-   - Yeni state: `const [chainStyle, setChainStyle] = useState<"rope"|"paperclip">("rope")`.
-   - Draft hydration / save / `currentDesign` / `loadFromGallery` bloklarına `chainStyle` eklenir.
-   - `canvasInner` içindeki SVG: mevcut iki `<path>` `chainStyle === "rope"` koşuluna alınır; `chainStyle === "paperclip"` ise yeni `<PaperclipChain leftX={...} rightX={...} y={...} dip={...} color={chainColor} />` bileşeni render edilir.
-   - Yeni yardımcı (aynı dosyada veya `src/components/PaperclipChain.tsx`):
-     - `useMemo` ile halka sayısını uzaklığa göre hesapla (örn. `Math.round((chainRightX - chainLeftX) * 0.45)` ~ 30 halka).
-     - Her halka için t'de `curvePoint` + teğet açısı ( türev: `dx/dt = 2(1-t)(cx-lx) + 2t(rx-cx)`; `dy/dt = 2(1-t)(dip-y) + 2t(y-dip)` ; `angle = atan2(dy,dx)`).
-     - Tek `<symbol>` + N `<use>` üretir.
-   - UI: Zincir paneline üçüncü bir buton ekle ("Ataç"). Renk seçimi (altın/gümüş) aynı kalır — paperclip moda da uygulanır.
+Komşu halkaların kesişim bölgesinde küçük bir maskeleme (SVG mask/clipPath) kullanılarak gerçek bağlantı hissi oluşturulabilir.
 
-4. **`src/components/DesignThumbnail.tsx`** — thumbnail'de basit destek: `chainStyle === "paperclip"` ise stroke yerine `strokeDasharray` ile yaklaşık halka deseni (thumbnail küçük; tam halka rendering gereksiz). Tip güncellenir.
+Öncelik:
 
-### Mobil performans notları
+Takı fotoğrafındaki zarif ve bütünleşik zincir görünümü.  
+Mekanik veya oyuncak zincir görünümünden kaçınılmalı.
 
-- ~30-40 `<use>` SVG node mobil için sorunsuz; React tarafında `useMemo` ile sadece slider değiştiğinde yeniden hesaplanır.
-- Halka pozisyonları render anında hesaplanır, animasyon/RAF yok → reflow maliyeti minimum.
-- `vectorEffect="non-scaling-stroke"` kullanılır; CSS transform yok.
-- Pointer/charm event'leri SVG `pointer-events: none` olduğundan etkilenmez; charm yerleştirme aynı `curvePoint` üzerinden devam ettiği için davranış değişmez.
+## Değiştirilecek dosyalar
 
-### Geriye dönük uyumluluk
+1. `src/components/PaperclipChain.tsx` — sembol geometrisi, gradient, stroke, step, `alt` mantığının kaldırılması.
+2. `src/routes/index.tsx` — iki `useState` başlangıç değeri.
 
-- Eski draft / kayıtlı tasarımlarda `chainStyle` yoksa varsayılan `"rope"` → mevcut Gold/Silver görünüm aynen korunur.
-- `Placed.t` semantiği değişmediği için tüm var olan kayıtlar paperclip'e geçildiğinde de doğru noktalarda durur.
+## Doğrulama
 
-## Riskler
-
-- Halkaların eğri üzerinde eşit aralıklı görünmesi için (basit t-dağılımı yerine) küçük bir arc-length yaklaşımı gerekebilir; ilk sürümde gözle test edip gerekirse 10 örneklemeli cumulative-length adımı eklenir.
-- Mobilde çok yüksek halka sayısı (>60) seçilirse FPS düşebilir → üst sınır 40.
+- Playwright ile preview'da:
+  - Sayfa yüklenince zincir Y=52 / sağ=92 / sol=9 / dip=90 oturmuş mu.
+  - "Ataç" moduna geçişte halka sayısı ≥ ~50, stroke ince, yatay highlight yumuşak.
+  - Altın varyant ekran görüntüsü dainty referansla karşılaştır.

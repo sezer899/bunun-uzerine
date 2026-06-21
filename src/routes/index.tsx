@@ -1385,7 +1385,14 @@ function Designer() {
       <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:gap-6 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)_200px]">
         {/* Left tray — stones (desktop) */}
         <div className="hidden lg:block">
-          <Tray title="Taşlar" items={stones} onDragStart={setDraggingNew} onPick={addToChain} />
+          <Tray
+            title="Taşlar"
+            items={stones}
+            onDragStart={setDraggingNew}
+            onPick={addToChain}
+            disabled={stonesLocked}
+            onDisabledAttempt={() => setWarning(stonesLockedMessage)}
+          />
         </div>
 
         {/* Center — model */}
@@ -1593,8 +1600,14 @@ function Designer() {
           <div className="sticky top-[60px] z-20 -mx-3 mt-3 border-y border-stone-300/60 bg-white/95 px-3 py-2 backdrop-blur lg:hidden">
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => setTrayOpen((t) => (t === "stones" ? null : "stones"))}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium active:scale-[0.98] ${trayOpen === "stones" ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 bg-white text-stone-800"}`}
+                onClick={() => {
+                  if (stonesLocked) {
+                    setWarning(stonesLockedMessage);
+                    return;
+                  }
+                  setTrayOpen((t) => (t === "stones" ? null : "stones"));
+                }}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium active:scale-[0.98] ${trayOpen === "stones" ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 bg-white text-stone-800"} ${stonesLocked ? "opacity-50" : ""}`}
               >
                 Taşlar
               </button>

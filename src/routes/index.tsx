@@ -737,6 +737,17 @@ function Designer() {
     }
   }, [stoneCount, seenTips.stoneDelete]);
 
+  const stonesLocked = chainStyle === "paperclip";
+  const stonesLockedMessage = "Taş eklemek için zincir tipini Misina olarak değiştirmelisiniz.";
+  useEffect(() => {
+    if (chainStyle === "paperclip" && !seenTips.paperclipInfo) {
+      setInfoBubble({
+        text: "Zincire sadece charm ve takı parçaları eklenebilir.",
+        seenKey: "paperclipInfo",
+      });
+    }
+  }, [chainStyle, seenTips.paperclipInfo]);
+
 
 
   // stones expand outward in the order [0, -1, +1, -2, +2, ...] with

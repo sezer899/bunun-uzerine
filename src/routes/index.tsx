@@ -843,6 +843,11 @@ function Designer() {
   const addToChain = (item: Item, stoneSize?: number) => {
     const stoneScale = item.category === "stone" && stoneSize ? STONE_SIZE_SCALE[stoneSize] : undefined;
 
+    if (item.category === "stone" && stonesLocked) {
+      setWarning(stonesLockedMessage);
+      return;
+    }
+
     if (item.category !== "stone") {
       snapshot();
       setPlaced((prev) => {

@@ -1639,7 +1639,7 @@ function Designer() {
 
           <div className="mt-3 space-y-2 rounded-xl border border-stone-300 bg-white/80 p-3 backdrop-blur">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-[10px] uppercase tracking-widest text-stone-600">Zincir</span>
+              <span className="text-[10px] uppercase tracking-widest text-stone-600">Renk</span>
               <div className="flex gap-2">
                 {(["silver", "gold"] as const).map((c) => (
                   <button
@@ -1678,7 +1678,7 @@ function Designer() {
                         : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
                     }`}
                   >
-                    {s === "rope" ? "Klasik" : "Ataç"}
+                    {s === "rope" ? "Misina" : "Zincir"}
                   </button>
                 ))}
               </div>

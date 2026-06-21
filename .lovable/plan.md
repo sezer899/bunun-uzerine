@@ -1,75 +1,53 @@
-# Paperclip Chain İnceltme + Klasik Zincir Öntanımlı Değerler
+# Paperclip Chain — Gerçek Ataç Zincir Görünümüne Geçiş
 
-## 1. `src/components/PaperclipChain.tsx` — narin/dainty stil
+## Mevcut sorun
 
-Mevcut `linkLen = 2.6` ve sembol viewport'u `20×6`. İstenen değişiklikler somut sayılara çevrilince:
+Şu anki render çok ince + çok yoğun örtüşme yüzünden zincir "burulmuş ip" gibi görünüyor; bireysel halkalar okunmuyor. Referans fotoğrafta:
 
-- **Halka boyutu %40 küçük**: `linkLen` 2.6 → **1.56**. Bu halka sayısını otomatik olarak ~1.66× artırır (arc-length tabanlı dağıtım), yani daha çok ve daha küçük halka.
-- **Yükseklik daha az** (uzunluk korunur, oval daha ince): sembol `rect` boyutu `20×6` → `20×3.6` (yükseklik %40 azaldı). `rx/ry` 3 → 1.8. `linkScale` hesabı `linkLen/20` zaten uzunluğu sürer; sadece `scale(linkScale, linkScale)` yerine yükseklikte ek çarpan **kaldırılıyor** (alt halkalar için `0.55` çarpanı vardı — kaldır). Tüm halkalar aynı ince oval olur.
-- **Stroke kalınlığı %50 azalt**: ana stroke `stroke / linkScale + 0.05` → yarıya. Yeni hesap: `(stroke * 0.5) / linkScale + 0.02`. Gölge stroke `+ 0.35` → `+ 0.15`. Highlight stroke 0.5 → 0.25.
-- **Komşu halkalar daha sıkı**: `step = linkLen * 0.72` → `linkLen * 0.55`. Halkalar uçlarından belirgin örtüşür → "fiziksel olarak geçmiş" hissi.
-- **Bevel/3D efekti hafifle**:
-  - Gradient yönü `x1=0 y1=0 x2=0 y2=1` (sert dikey bevel) → `x1=0 y1=0 x2=1 y2=0.4` (yumuşak yatay highlight).
-  - Renk stop'ları daha sade: gold `{ a: "#a07626", b: "#f4e0a3", c: "#b8852a" }`, silver `{ a: "#9aa0a6", b: "#eef0f2", c: "#a3a8af" }`. Tek ton bandı; aşırı parlama yok.
-  - İç highlight opaklığı 0.55 → 0.35.
-  - Gölge alpha 0.28 → 0.18; offset `translate(0,0.7)` → `translate(0,0.3)`.
-- **Alt-halka 90° dönüş özelliği** (`alt: i % 2 === 1` ve `* 0.55` y-ölçeği) **kaldırılır** — gerçek paperclip zincirlerinde halkalar aynı yönde sıralanır.
-- **Üst sınır**: `n` max 48 → 80 (daha küçük halka × daha kalabalık zincir). Min: 10. Mobil performans için yeterli (`<use>` ucuz).
+- Halkalar net görünen, içi boş, uzun dikdörtgen oval şeklinde
+- Komşu halkalar **örtüşmüyor** — uçları birbirine değiyor (ataç mantığı)
+- Stroke yeterince kalın ki halka oval okunabilsin
+- Aspect ≈ 3:1 (uzun ve dar), düz altın ton, hafif highlight
 
-Yeni `links` üretimi aynı arc-length örnekleme mantığını korur (`SAMPLES=40`); sadece `linkLen` ve `step` değişir. Charm yerleşimini etkilemez — bu hâlâ yalnızca görsel katmandır.
+## Çözüm — `src/components/PaperclipChain.tsx`
 
-## 2. `src/routes/index.tsx` — klasik zincir öntanımlı slider değerleri
+Halkayı daha okunaklı yap, örtüşmeyi kaldır, hollow oval şeklini öne çıkar.
 
-Mevcut başlangıç state'leri:
+**Geometri**:
+- `linkLen` 1.56 → **2.6** (referansta halkalar belirgin; saç teli kalınlığında değil)
+- Sembol viewport halka boyutu: width 20, height **5.4** (aspect ≈ 3.7:1). `rx/ry` = 2.7.
+- `step = linkLen * 0.95` → halkalar **uç uca**, hafif bir görsel boşluk (referanstaki gibi).
+- `n` hesabı aynı arc-length tabanlı; min 6, max 60.
 
-```ts
-const [chainDip, setChainDip] = useState(90);     // ✓ zaten 90
-const [chainLeftX, setChainLeftX] = useState(9);  // ✓ zaten 9
-const [chainRightX, setChainRightX] = useState(91); // → 92
-const [chainY, setChainY] = useState(45);         // → 52
-```
+**Stroke / kontrast**:
+- `stroke = baseWidth * 1.4` — halka şekli okunsun. SVG viewBox biriminde ~0.63.
+- Ana stroke: `stroke / linkScale` (sabit, ek toplama yok). Bu büyük halkalı non-scaling-stroke'la ortalama 1.0-1.2 px görüntüde çizgi.
+- Gölge stroke: ana + 0.4 (görünür ama hafif), opaklık 0.22, offset y=0.5.
+- İç highlight: çok hafif, opacity 0.25, kaldırabiliriz; referansta yok.
 
-Sadece iki sayı değişir: `chainRightX` 91→**92**, `chainY` 45→**52**.
+**Render sırası**:
+- Çift-sonra-tek "interlock" mantığı **kaldırılıyor** (referansta halkalar üst üste değil yan yana). Tek geçişte sırayla çiziliyor.
 
-Not: Bu değerler ilk mount için varsayılan; mevcut localStorage taslağı varsa override edilir (draft hydration). Yeni kullanıcı / taslak yokken istenen 90/9/92/52 değerleri uygulanır.  
-  
-Paperclip Chain iyileştirmelerine ek olarak:
+**Renkler** (daha düz altın ton, soft highlight):
+- Gold: `{ a: "#b07a25", b: "#e8c168", c: "#9c6a1f" }`
+- Silver: `{ a: "#9aa0a6", b: "#dde1e5", c: "#8a9099" }`
+- Gradient yönü: `x1=0 y1=0 x2=0 y2=1` (üstte hafif daha açık).
 
-Bağlantı hissini artır.
+**Halka yön kararı**: referansta halkalar dik (uzun ekseni zincir yönünde). Mevcut kod zaten tangent açısıyla hizalıyor — değişmiyor.
 
-Şu an halkalar yan yana dizilmiş görünüyor.
+## `src/routes/index.tsx`
 
-İstediğim görünüm:
-
-- Her halka bir sonraki halkanın içinden geçmiş gibi görünmeli.
-- Komşu halkalar yaklaşık %25-35 oranında üst üste binsin.
-- Zincir tek bir bütün gibi algılansın.
-- Ayrık zincir halkaları görüntüsünden kaçınılsın.
-
-Render sırası:
-
-- Çift indeksli halkalar önce çizilsin.
-- Tek indeksli halkalar sonra çizilsin.
-
-Böylece halkaların birbirinin içinden geçtiği hissi oluşsun.
-
-Alternatif olarak:
-
-Komşu halkaların kesişim bölgesinde küçük bir maskeleme (SVG mask/clipPath) kullanılarak gerçek bağlantı hissi oluşturulabilir.
-
-Öncelik:
-
-Takı fotoğrafındaki zarif ve bütünleşik zincir görünümü.  
-Mekanik veya oyuncak zincir görünümünden kaçınılmalı.
-
-## Değiştirilecek dosyalar
-
-1. `src/components/PaperclipChain.tsx` — sembol geometrisi, gradient, stroke, step, `alt` mantığının kaldırılması.
-2. `src/routes/index.tsx` — iki `useState` başlangıç değeri.
+Değişmez — slider varsayılanları doğru (90/9/92/52).
 
 ## Doğrulama
 
-- Playwright ile preview'da:
-  - Sayfa yüklenince zincir Y=52 / sağ=92 / sol=9 / dip=90 oturmuş mu.
-  - "Ataç" moduna geçişte halka sayısı ≥ ~50, stroke ince, yatay highlight yumuşak.
-  - Altın varyant ekran görüntüsü dainty referansla karşılaştır.
+Playwright ile:
+1. localStorage temizle, sayfa yükle, "Ataç" + "Altın" seç.
+2. Ekran görüntüsü al, charm/chain bölgesini crop ile büyütüp referansa karşı görsel kontrol.
+3. Halka sayısının ~30-45 aralığında olduğunu (use count) ve halkaların **bireysel** okunduğunu doğrula.
+4. Gerekirse `linkLen` veya `step` değerini tek bir mikro-tur ile rafine et (örn. step 0.95 → 0.92).
+
+## Riskler
+
+- Halka büyütüldüğünde charm'ların altında "altta görünen" bir his oluşabilir — charm boyutu BASE değişmediği için zaten charm yeterince büyük; sorun olmaz.
+- Mobil: 30-45 `<use>` → sorunsuz.

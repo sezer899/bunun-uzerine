@@ -41,8 +41,8 @@ export function PaperclipChain({
   const id = color === "gold" ? "paperclip-gold" : "paperclip-silver";
   const stops =
     color === "gold"
-      ? { a: "#a07626", b: "#f4e0a3", c: "#b8852a" }
-      : { a: "#9aa0a6", b: "#eef0f2", c: "#a3a8af" };
+      ? { a: "#b07a25", b: "#e8c168", c: "#9c6a1f" }
+      : { a: "#9aa0a6", b: "#dde1e5", c: "#8a9099" };
 
   const links = useMemo(() => {
     // Arc-length yaklaşımı: 40 örnek topla, eşit aralıklarla dağıt.
@@ -61,11 +61,11 @@ export function PaperclipChain({
     }
     const total = cum[cum.length - 1] || 1;
 
-    // Halka boyutu: viewBox birimi. Dainty/narin paperclip estetiği.
-    // Uzunluk korunur (~önceki); yükseklik %40 azaldı (sembol viewport'unda).
-    const linkLen = 1.56; // major axis (önceki 2.6 → %40 küçültme)
-    const step = linkLen * 0.68; // ~32% örtüşme: halkalar birbirine geçmiş hissi
-    const n = Math.max(10, Math.min(80, Math.floor(total / step)));
+    // Gerçek paperclip zincir: halkalar uç uca dizilir, bireysel olarak
+    // okunur. Hafif boşluk bırakılır (referans fotoğraf).
+    const linkLen = 2.6; // major axis (viewBox birimi)
+    const step = linkLen * 0.95; // ~5% çakışma: uçlar değer ama örtüşmez
+    const n = Math.max(6, Math.min(60, Math.floor(total / step)));
     // Halkaları eğri boyunca ortala
     const used = (n - 1) * step;
     const startOffset = (total - used) / 2;
@@ -87,73 +87,64 @@ export function PaperclipChain({
     return { items: result, linkLen };
   }, [leftX, rightX, y, dip]);
 
-  // Halka ölçeği (SVG viewBox 0..100). Sembol -10..10 x -1.8..1.8 (yükseklik
-  // azaltılmış ince oval). Uzunluk: linkLen/20 ölçeği ile küçültülür.
+  // Halka ölçeği (SVG viewBox 0..100). Sembol -10..10 x -2.7..2.7 (aspect ~3.7:1).
+  // Uzunluk: linkLen/20 ölçeği ile küçültülür.
   const linkScale = links.linkLen / 20;
-  const stroke = baseWidth * 0.48; // %50+ inceltme
-
-  // Çift-tek render sırası: önce çift indeksli halkalar, sonra tek indeksliler.
-  // Tek halkalar üste binince zincirin halkaları birbirinin içinden geçiyor
-  // hissi verir.
-  const ordered = useMemo(() => {
-    const evens = links.items.map((l, i) => ({ l, i })).filter(({ i }) => i % 2 === 0);
-    const odds = links.items.map((l, i) => ({ l, i })).filter(({ i }) => i % 2 === 1);
-    return [...evens, ...odds];
-  }, [links]);
+  const stroke = baseWidth * 1.4; // okunur halka kalınlığı
 
   return (
     <>
       <defs>
-        <linearGradient id={`${id}-grad`} x1="0" y1="0" x2="1" y2="0.4">
-          <stop offset="0%" stopColor={stops.a} />
-          <stop offset="50%" stopColor={stops.b} />
+        <linearGradient id={`${id}-grad`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stops.b} />
+          <stop offset="55%" stopColor={stops.a} />
           <stop offset="100%" stopColor={stops.c} />
         </linearGradient>
         <symbol id={id} overflow="visible">
           {/* dış halka — yumuşak gölge */}
           <rect
             x={-10}
-            y={-1.8}
+            y={-2.7}
             width={20}
-            height={3.6}
-            rx={1.8}
-            ry={1.8}
+            height={5.4}
+            rx={2.7}
+            ry={2.7}
             fill="none"
-            stroke="rgba(0,0,0,0.18)"
-            strokeWidth={(stroke / linkScale) + 0.15}
+            stroke="rgba(0,0,0,0.22)"
+            strokeWidth={(stroke / linkScale) + 0.4}
             vectorEffect="non-scaling-stroke"
-            transform="translate(0,0.3)"
+            transform="translate(0,0.5)"
           />
           {/* ana halka */}
           <rect
             x={-10}
-            y={-1.8}
+            y={-2.7}
             width={20}
-            height={3.6}
-            rx={1.8}
-            ry={1.8}
+            height={5.4}
+            rx={2.7}
+            ry={2.7}
             fill="none"
             stroke={`url(#${id}-grad)`}
-            strokeWidth={(stroke / linkScale) + 0.02}
+            strokeWidth={stroke / linkScale}
             vectorEffect="non-scaling-stroke"
           />
-          {/* hafif iç highlight */}
+          {/* çok hafif iç highlight */}
           <rect
-            x={-9.5}
-            y={-1.4}
-            width={19}
-            height={2.8}
-            rx={1.4}
-            ry={1.4}
+            x={-9.6}
+            y={-2.3}
+            width={19.2}
+            height={4.6}
+            rx={2.3}
+            ry={2.3}
             fill="none"
             stroke={stops.b}
-            strokeOpacity={0.35}
-            strokeWidth={0.25}
+            strokeOpacity={0.25}
+            strokeWidth={0.35}
             vectorEffect="non-scaling-stroke"
           />
         </symbol>
       </defs>
-      {ordered.map(({ l, i }) => (
+      {links.items.map((l, i) => (
         <use
           key={i}
           href={`#${id}`}

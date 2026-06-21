@@ -1,53 +1,40 @@
-# Paperclip Chain — Gerçek Ataç Zincir Görünümüne Geçiş
+## Goal
+Update defaults, relabel chain controls, and lock out stones when the paperclip (zincir) style is selected.
 
-## Mevcut sorun
+## Changes (single file: `src/routes/index.tsx`)
 
-Şu anki render çok ince + çok yoğun örtüşme yüzünden zincir "burulmuş ip" gibi görünüyor; bireysel halkalar okunmuyor. Referans fotoğrafta:
+### 1) Default values
+- `chainDip` initial `90` → `88`
+- `chainRightX` initial `92` → `91`
+- `chainY` initial `52` (unchanged, already 52)
+- `chainLeftX` initial `9` (unchanged)
+- `lightIntensity` initial `1` → `0.65`
 
-- Halkalar net görünen, içi boş, uzun dikdörtgen oval şeklinde
-- Komşu halkalar **örtüşmüyor** — uçları birbirine değiyor (ataç mantığı)
-- Stroke yeterince kalın ki halka oval okunabilsin
-- Aspect ≈ 3:1 (uzun ve dar), düz altın ton, hafif highlight
+(`loadDraft` rehydration logic stays the same so saved drafts keep their own values.)
 
-## Çözüm — `src/components/PaperclipChain.tsx`
+### 2) Relabeling
+- Row label currently rendering `"Zincir"` (above color buttons, ~line 1642) → `"Renk"`.
+- Chain type buttons (~line 1681): `"Klasik"` → `"Misina"`, `"Ataç"` → `"Zincir"`.
 
-Halkayı daha okunaklı yap, örtüşmeyi kaldır, hollow oval şeklini öne çıkar.
+### 3) Paperclip ("Zincir") info bubble
+Add an effect that, when `chainStyle === "paperclip"` becomes active and the user hasn't seen the tip yet, shows the existing `infoBubble` with text:
+> "Zincire sadece charm ve takı parçaları eklenebilir."
 
-**Geometri**:
-- `linkLen` 1.56 → **2.6** (referansta halkalar belirgin; saç teli kalınlığında değil)
-- Sembol viewport halka boyutu: width 20, height **5.4** (aspect ≈ 3.7:1). `rx/ry` = 2.7.
-- `step = linkLen * 0.95` → halkalar **uç uca**, hafif bir görsel boşluk (referanstaki gibi).
-- `n` hesabı aynı arc-length tabanlı; min 6, max 60.
+Uses the existing `seenTips` key (e.g. `paperclipInfo`) so it appears once per session.
 
-**Stroke / kontrast**:
-- `stroke = baseWidth * 1.4` — halka şekli okunsun. SVG viewBox biriminde ~0.63.
-- Ana stroke: `stroke / linkScale` (sabit, ek toplama yok). Bu büyük halkalı non-scaling-stroke'la ortalama 1.0-1.2 px görüntüde çizgi.
-- Gölge stroke: ana + 0.4 (görünür ama hafif), opaklık 0.22, offset y=0.5.
-- İç highlight: çok hafif, opacity 0.25, kaldırabiliriz; referansta yok.
+### 4) Lock stones when paperclip is selected
+When `chainStyle === "paperclip"`:
+- **Visual:** Render the stones Tray (desktop left tray, mobile "Taşlar" tab button, and tray sheet content) with reduced opacity + `pointer-events` blocked overlay (or a wrapper that intercepts pointer events).
+- **Behavior:** Clicking the muted Taşlar tab/tile/size button or attempting drag triggers a warning toast / `infoBubble`:
+  > "Taş eklemek için zincir tipini Misina olarak değiştirmelisiniz."
+- **Hard guard in `addToChain`:** if `item.category === "stone"` and `chainStyle === "paperclip"`, ignore and surface the same warning instead of placing.
 
-**Render sırası**:
-- Çift-sonra-tek "interlock" mantığı **kaldırılıyor** (referansta halkalar üst üste değil yan yana). Tek geçişte sırayla çiziliyor.
+Implementation approach:
+- Add a derived `stonesLocked = chainStyle === "paperclip"`.
+- Pass `disabledReason?: string` and `onDisabledAttempt?: () => void` props to `Tray`; when set, the tray renders with `opacity-60`, the inner click/drag handlers call `onDisabledAttempt` instead of `onPick`/`onDragStart`. Cards get `cursor-not-allowed`, draggable disabled.
+- Same gating in the mobile sticky `Taşlar` tab button: when locked, clicking it shows the warning instead of opening the sheet.
+- `addToChain` early-return + warning fallback for stones when locked.
 
-**Renkler** (daha düz altın ton, soft highlight):
-- Gold: `{ a: "#b07a25", b: "#e8c168", c: "#9c6a1f" }`
-- Silver: `{ a: "#9aa0a6", b: "#dde1e5", c: "#8a9099" }`
-- Gradient yönü: `x1=0 y1=0 x2=0 y2=1` (üstte hafif daha açık).
-
-**Halka yön kararı**: referansta halkalar dik (uzun ekseni zincir yönünde). Mevcut kod zaten tangent açısıyla hizalıyor — değişmiyor.
-
-## `src/routes/index.tsx`
-
-Değişmez — slider varsayılanları doğru (90/9/92/52).
-
-## Doğrulama
-
-Playwright ile:
-1. localStorage temizle, sayfa yükle, "Ataç" + "Altın" seç.
-2. Ekran görüntüsü al, charm/chain bölgesini crop ile büyütüp referansa karşı görsel kontrol.
-3. Halka sayısının ~30-45 aralığında olduğunu (use count) ve halkaların **bireysel** okunduğunu doğrula.
-4. Gerekirse `linkLen` veya `step` değerini tek bir mikro-tur ile rafine et (örn. step 0.95 → 0.92).
-
-## Riskler
-
-- Halka büyütüldüğünde charm'ların altında "altta görünen" bir his oluşabilir — charm boyutu BASE değişmediği için zaten charm yeterince büyük; sorun olmaz.
-- Mobil: 30-45 `<use>` → sorunsuz.
+## Out of scope
+- No changes to `PaperclipChain.tsx`, storage shape, or saved-design types.
+- Charm and part flows untouched.

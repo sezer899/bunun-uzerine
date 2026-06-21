@@ -41,8 +41,8 @@ export function PaperclipChain({
   const id = color === "gold" ? "paperclip-gold" : "paperclip-silver";
   const stops =
     color === "gold"
-      ? { a: "#8a5f12", b: "#fff0bf", c: "#a87a1f" }
-      : { a: "#7c8189", b: "#f3f4f6", c: "#9ca3af" };
+      ? { a: "#a07626", b: "#f4e0a3", c: "#b8852a" }
+      : { a: "#9aa0a6", b: "#eef0f2", c: "#a3a8af" };
 
   const links = useMemo(() => {
     // Arc-length yaklaşımı: 40 örnek topla, eşit aralıklarla dağıt.
@@ -61,15 +61,16 @@ export function PaperclipChain({
     }
     const total = cum[cum.length - 1] || 1;
 
-    // Halka boyutu: viewBox birimi. Mobil performans için üst sınır.
-    const linkLen = 2.6; // major axis
-    const step = linkLen * 0.72; // halkalar uçlarından birbirine geçer
-    const n = Math.max(6, Math.min(48, Math.floor(total / step)));
+    // Halka boyutu: viewBox birimi. Dainty/narin paperclip estetiği.
+    // Uzunluk korunur (~önceki); yükseklik %40 azaldı (sembol viewport'unda).
+    const linkLen = 1.56; // major axis (önceki 2.6 → %40 küçültme)
+    const step = linkLen * 0.68; // ~32% örtüşme: halkalar birbirine geçmiş hissi
+    const n = Math.max(10, Math.min(80, Math.floor(total / step)));
     // Halkaları eğri boyunca ortala
     const used = (n - 1) * step;
     const startOffset = (total - used) / 2;
 
-    const result: { x: number; y: number; angle: number; alt: boolean }[] = [];
+    const result: { x: number; y: number; angle: number }[] = [];
     let j = 1;
     for (let i = 0; i < n; i++) {
       const target = startOffset + i * step;
@@ -81,73 +82,82 @@ export function PaperclipChain({
       const p = curvePoint(t, leftX, rightX, y, dip);
       const tan = curveTangent(t, leftX, rightX, y, dip);
       const angle = (Math.atan2(tan.dy, tan.dx) * 180) / Math.PI;
-      result.push({ x: p.x, y: p.y, angle, alt: i % 2 === 1 });
+      result.push({ x: p.x, y: p.y, angle });
     }
     return { items: result, linkLen };
   }, [leftX, rightX, y, dip]);
 
-  // Halka ölçeği (SVG viewBox 0..100). Halkayı çizimde sembol içinde
-  // -10..10 x -3..3 olarak tanımlıyoruz; scale ile linkLen/20'ye küçültüyoruz.
+  // Halka ölçeği (SVG viewBox 0..100). Sembol -10..10 x -1.8..1.8 (yükseklik
+  // azaltılmış ince oval). Uzunluk: linkLen/20 ölçeği ile küçültülür.
   const linkScale = links.linkLen / 20;
-  const stroke = baseWidth * 0.95;
+  const stroke = baseWidth * 0.48; // %50+ inceltme
+
+  // Çift-tek render sırası: önce çift indeksli halkalar, sonra tek indeksliler.
+  // Tek halkalar üste binince zincirin halkaları birbirinin içinden geçiyor
+  // hissi verir.
+  const ordered = useMemo(() => {
+    const evens = links.items.map((l, i) => ({ l, i })).filter(({ i }) => i % 2 === 0);
+    const odds = links.items.map((l, i) => ({ l, i })).filter(({ i }) => i % 2 === 1);
+    return [...evens, ...odds];
+  }, [links]);
 
   return (
     <>
       <defs>
-        <linearGradient id={`${id}-grad`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={stops.b} />
-          <stop offset="50%" stopColor={stops.c} />
-          <stop offset="100%" stopColor={stops.a} />
+        <linearGradient id={`${id}-grad`} x1="0" y1="0" x2="1" y2="0.4">
+          <stop offset="0%" stopColor={stops.a} />
+          <stop offset="50%" stopColor={stops.b} />
+          <stop offset="100%" stopColor={stops.c} />
         </linearGradient>
         <symbol id={id} overflow="visible">
-          {/* dış halka — gölge */}
+          {/* dış halka — yumuşak gölge */}
           <rect
             x={-10}
-            y={-3}
+            y={-1.8}
             width={20}
-            height={6}
-            rx={3}
-            ry={3}
+            height={3.6}
+            rx={1.8}
+            ry={1.8}
             fill="none"
-            stroke="rgba(0,0,0,0.28)"
-            strokeWidth={stroke / linkScale + 0.35}
+            stroke="rgba(0,0,0,0.18)"
+            strokeWidth={(stroke / linkScale) + 0.15}
             vectorEffect="non-scaling-stroke"
-            transform="translate(0,0.7)"
+            transform="translate(0,0.3)"
           />
           {/* ana halka */}
           <rect
             x={-10}
-            y={-3}
+            y={-1.8}
             width={20}
-            height={6}
-            rx={3}
-            ry={3}
+            height={3.6}
+            rx={1.8}
+            ry={1.8}
             fill="none"
             stroke={`url(#${id}-grad)`}
-            strokeWidth={stroke / linkScale + 0.05}
+            strokeWidth={(stroke / linkScale) + 0.02}
             vectorEffect="non-scaling-stroke"
           />
-          {/* iç highlight */}
+          {/* hafif iç highlight */}
           <rect
-            x={-9.4}
-            y={-2.4}
-            width={18.8}
-            height={4.8}
-            rx={2.4}
-            ry={2.4}
+            x={-9.5}
+            y={-1.4}
+            width={19}
+            height={2.8}
+            rx={1.4}
+            ry={1.4}
             fill="none"
             stroke={stops.b}
-            strokeOpacity={0.55}
-            strokeWidth={0.5}
+            strokeOpacity={0.35}
+            strokeWidth={0.25}
             vectorEffect="non-scaling-stroke"
           />
         </symbol>
       </defs>
-      {links.items.map((l, i) => (
+      {ordered.map(({ l, i }) => (
         <use
           key={i}
           href={`#${id}`}
-          transform={`translate(${l.x} ${l.y}) rotate(${l.angle}) scale(${linkScale} ${linkScale * (l.alt ? 0.55 : 1)})`}
+          transform={`translate(${l.x} ${l.y}) rotate(${l.angle}) scale(${linkScale})`}
         />
       ))}
     </>
